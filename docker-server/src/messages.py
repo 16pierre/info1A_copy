@@ -30,7 +30,7 @@ class MessageManager(object):
         idx = self.next_msg_id
         while len(messages) < count and idx >= 0:
             if idx in self.messages:
-                messages.append(self.messages[idx].to_dict())
+                messages.insert(0, self.messages[idx].to_dict())
             idx -= 1
         
         return json.dumps(messages)

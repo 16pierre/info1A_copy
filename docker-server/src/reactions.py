@@ -31,4 +31,12 @@ class ReactionsManager(object):
             current_authors_for_emoji_and_msg.append(emetteur)
     
     def get_reactions(self, msg_id):
+        if msg_id not in self.reactions:
+            return {}
         return self.reactions[msg_id]
+    
+    def get_many_reactions(self, msg_id_min, msg_id_max):
+        return {
+            k: v for k, v in self.reactions.items()
+            if k >= msg_id_min and k <= msg_id_max
+        }

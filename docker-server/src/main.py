@@ -4,8 +4,15 @@ import json
 from auth import AuthManager
 from messages import MessageManager
 from reactions import ReactionsManager
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 app = flask.Flask(__name__)
+limiter = Limiter(
+    app,
+    key_func=get_remote_address,
+    default_limits=["5 per second"]
+)
 auth_manager = AuthManager()
 message_manager = MessageManager()
 reactions_manager = ReactionsManager()
@@ -13,6 +20,10 @@ reactions_manager = ReactionsManager()
 @app.route('/', methods=['GET'])
 def home():
     return {"erreur": "Chemin invalide, essaye '/messages'"}, 404
+
+@app.route('/tp', methods=['GET'])
+def tp():
+    return flask.redirect("https://github.com/ue22/backend-alumni", code=301)
 
 @app.route('/register', methods=['POST'])
 def register():
@@ -38,7 +49,8 @@ def register():
 @app.route('/messages', methods=['GET', 'POST'])
 def messages():
     if request.method == 'GET':
-        return message_manager.get_messages()
+        count = int(request.args.get('count', default=30))
+        return message_manager.get_messages(count)
     
     try:
         data = request.get_json(force=True)
@@ -50,11 +62,16 @@ def messages():
     contenu = data.get("contenu")
     if contenu is None:
         return {"erreur": "Le parametre 'contenu' est nul."}, 400
+    if len(contenu) > 100:
+        return {"erreur": "Le message est trop long."}, 400
     mdp = data.get("mdp")
     verified = mdp is not None
     if verified and not auth_manager.is_valid_user(emetteur, mdp):
             return {"erreur": "Le mot de passe est invalide"}, 400
     
+    if "piche" in contenu.lower():
+        return {"erreur": "Le message contient un mot interdit."}, 400
+
     message_manager.add_message(emetteur, contenu, verified)
     return {"success": True}
 
@@ -62,13 +79,18 @@ def messages():
 def reactions():
     if request.method == 'GET':
         msg_id = request.args.get('messageId')
+        msg_id_max = request.args.get('messageIdMax')
         if msg_id is None:
             return {"erreur": "Le parametre 'messageId' est nul."}, 400
         try:
             msg_id = int(msg_id)
         except Exception:
             return {"erreur": "Le parametre 'messageId' n'est pas un entier."}, 400
-        return reactions_manager.get_reactions(msg_id)
+        
+        if msg_id_max:
+            return reactions_manager.get_many_reactions(msg_id, int(msg_id_max))
+        else:
+            return reactions_manager.get_reactions(msg_id)
     
     try:
         data = request.get_json(force=True)
